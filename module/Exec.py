@@ -61,7 +61,7 @@ class ExecCmd:
             try:
                 cliSocket = self.cliMap[nickname]
                 if (cliSocket != self.cliSock):
-                    cliSocket.send(f'MSG[*$%]{message}')
+                    cliSocket.send(f'MSG[*$%]{nickname}[*$%]{message}')
             except Exception as e:
                 print (e)
 
