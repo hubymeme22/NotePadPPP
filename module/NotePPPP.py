@@ -10,7 +10,8 @@ Author: Hubert F. Espinola I (HueHueberry)
 
 '''
 from Protocol import ProtoCommandParser
-from Exec import ExecCmd
+from Exec import ExecCmd, nullFunction
+from datetime import datetime
 import socket
 import threading
 
@@ -43,12 +44,14 @@ class NotePPPPServer:
         if (len(data) > 0):
             self.cliList[data] = {}
             self.cliList[data]['socket'] = cli_sock
-            print (f'[*] New Client added ({data})')
-
             self.cliList[data]['handled'] = True
 
+            print (f'[*] New Client added ({data})')
             th = threading.Thread(target=self.__handleClientRequests, args=(data,))
             th.start()
+
+            # sends confirmation to client
+            cli_sock.send('OK'.encode())
         else:
             print (f'[-] Client connection failed')
             cli_sock.close()
@@ -102,3 +105,76 @@ class NotePPPPServer:
         if (cliNick in self.cliList):
             return self.cliList[cliNick]
         return {}
+
+'''
+Client class for communicating to server
+'''
+class NotePPPPClient:
+    def __init__(self, ip: str, port: int) -> None:
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.commandExec = ExecCmd(self.socket)
+
+        # client details
+        self.ip = ip
+        self.port = port
+        self.nickname = None
+        self.isConnected = False
+        self.loopUpdate = True
+
+        # initialize with sample message
+        now = datetime.now()
+        current_time = now.strftime("%H:%M:%S")
+        self.messageLog = [{'Author': [current_time, 'Hello everybody! Welcome to NotepadPPP!']}]
+
+    # constantly recieves from server's updates
+    def __recieveUpdate(self):
+        while self.loopUpdate:
+            try:
+                packet = self.socket.recv(1024).decode()
+                parser = ProtoCommandParser(packet)
+
+                added = self.commandExec.addComs(parser)
+                self.commandExec.execute()
+            except Exception as e:
+                print (f'[Error __recieveUpdate] {e}')
+                self.stop()
+
+    # connect with the server
+    def connect(self, nickname: str):
+        self.nickname = nickname
+
+        try:
+            self.socket.connect((self.ip, self.port))
+            self.socket.send(nickname.encode())
+            response = self.socket.recv(1024).decode()
+
+            self.isConnected = (response == 'OK')
+            return self.isConnected
+        except Exception as e:
+            print (f'[Error Client.connect] {e}')
+
+    # starts constant recieving
+    def start(self):
+        self.loopUpdate = True
+        th = threading.Thread(target=self.__recieveUpdate, args=())
+        th.start()
+
+    # stops constant recieving
+    def stop(self):
+        self.loopUpdate = False
+
+    # client callback updater
+    def callbackUpdate(self, key, callback=nullFunction):
+        if (key not in self.commandExec.cliCallbacks):
+            return False
+
+        # the callback for this recieves a message
+        # ex, callback(message)
+        self.commandExec.cliCallbacks[key] = callback
+        return True
+
+    ############################
+    #  Client Functionalities  #
+    ############################
+    def message(self, message: str):
+        self.socket.send(f'FWD[*$%]{message}'.encode())

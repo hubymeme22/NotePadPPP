@@ -14,12 +14,19 @@ def nullFunction():
     pass
 
 class ExecCmd:
-    def __init__(self, cliSock: socket.socket, cliMap: dict) -> None:
+    def __init__(self, cliSock: socket.socket, cliMap: dict={}) -> None:
         self.cliSock = cliSock
         self.cliMap = cliMap
 
         # current command
         self.command = None
+        self.nickname = ''
+
+        # nickname retrieval
+        for nickname in self.cliMap:
+            if (self.cliSock == self.cliMap[nickname]['socket']):
+                self.nickname = nickname
+                break
 
         # for executing functions
         self.execMap = {
@@ -56,12 +63,14 @@ class ExecCmd:
     #  Server Actions  #
     ####################
     # forwards all the message to other clients
-    def forward(self, message: str):
+    def forward(self, args: list):
+        message = args[0]
         for nickname in self.cliMap:
             try:
-                cliSocket = self.cliMap[nickname]
+                cliSocket = self.cliMap[nickname]['socket']
                 if (cliSocket != self.cliSock):
-                    cliSocket.send(f'MSG[*$%]{nickname}[*$%]{message}')
+                    print (f'[MESSAGE] from {self.nickname} to {nickname}')
+                    cliSocket.send(f'MSG[*$%]{self.nickname}[*$%]{message}'.encode())
             except Exception as e:
                 print (e)
 
@@ -69,6 +78,6 @@ class ExecCmd:
     #  Client Actions  #
     ####################
     # when message is recieved by client
-    def message(self, message: str):
-        self.cliCallbacks['MSG'](message)
-        print (f'Message: {message}')
+    def message(self, args: list):
+        message = args[1]
+        self.cliCallbacks['MSG'](args)

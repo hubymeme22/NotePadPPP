@@ -29,11 +29,9 @@ class ProtoCommandParser:
         return self.getCommand()
 
     # retrieves the argument/s
-    def getArgs(self) -> str:
-        if (self.args != None):
-            return self.args
-
+    def getArgs(self) -> list:
         if (len(self.packet) >= 2):
-            self.args = self.packet[1]
+            self.args = self.packet[1:]
+            return self.args
         else:
-            return ''
+            return []
